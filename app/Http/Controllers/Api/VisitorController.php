@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Visitor;
 use Illuminate\Http\Request;
 
 class VisitorController extends Controller
@@ -12,7 +13,7 @@ class VisitorController extends Controller
      */
     public function index()
     {
-        //
+        return response()->json(Visitor::all());
     }
 
     /**
@@ -20,7 +21,15 @@ class VisitorController extends Controller
      */
     public function store(Request $request)
     {
-        //
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'email' => 'required|email',
+                'phone' => 'nullable|string'
+            ]);
+
+            $visitor = Visitor::create($validated);
+
+            return response()->json($visitor, 201);
     }
 
     /**
@@ -28,7 +37,7 @@ class VisitorController extends Controller
      */
     public function show(string $id)
     {
-        //
+        return response()->json(Visitor::findOrFail($id));
     }
 
     /**
@@ -36,7 +45,11 @@ class VisitorController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+            $visitor = Visitor::findOrFail($id);
+
+            $visitor->update($request->all());
+
+            return response()->json($visitor);
     }
 
     /**
@@ -44,6 +57,12 @@ class VisitorController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+            $visitor = Visitor::findOrFail($id);
+
+            $visitor->delete();
+
+            return response()->json([
+                'message' => 'Visitor deleted successfully'
+            ]);
     }
 }

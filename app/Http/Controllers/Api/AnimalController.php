@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Animal;
 use Illuminate\Http\Request;
 
 class AnimalController extends Controller
@@ -12,7 +13,7 @@ class AnimalController extends Controller
      */
     public function index()
     {
-        //
+         return response()->json(Animal::all());
     }
 
     /**
@@ -20,7 +21,16 @@ class AnimalController extends Controller
      */
     public function store(Request $request)
     {
-        //
+            $validated = $request->validate([
+                'name' => 'required|string|max:255',
+                'species' => 'required|string|max:255',
+                'age' => 'required|integer',
+                'exhibit_id' => 'required|exists:exhibits,id'
+            ]);
+
+            $animal = Animal::create($validated);
+
+            return response()->json($animal, 201);
     }
 
     /**
@@ -28,7 +38,9 @@ class AnimalController extends Controller
      */
     public function show(string $id)
     {
-        //
+            $animal = Animal::findOrFail($id);
+
+            return response()->json($animal);
     }
 
     /**
@@ -36,7 +48,11 @@ class AnimalController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+            $animal = Animal::findOrFail($id);
+
+            $animal->update($request->all());
+
+            return response()->json($animal);
     }
 
     /**
@@ -44,6 +60,12 @@ class AnimalController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+            $animal = Animal::findOrFail($id);
+
+            $animal->delete();
+
+            return response()->json([
+                'message' => 'Animal deleted successfully'
+            ]);
     }
 }

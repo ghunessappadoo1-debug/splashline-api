@@ -13,6 +13,10 @@ return new class extends Migration
     {
         Schema::create('tours', function (Blueprint $table) {
             $table->id();
+            $table->string('title');
+            $table->text('description')->nullable();
+            $table->dateTime('schedule_time');
+            $table->integer('max_capacity');
             $table->timestamps();
         });
     }

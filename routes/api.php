@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\TicketController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\FeedingScheduleController;
 use App\Http\Controllers\Api\TourController;
+use App\Http\Controllers\Api\TourRegistrationController;
 
 Route::apiResource('exhibits', ExhibitController::class);
 Route::apiResource('animals', AnimalController::class);
@@ -16,3 +17,4 @@ Route::apiResource('tickets', TicketController::class);
 Route::apiResource('bookings', BookingController::class);
 Route::apiResource('feeding-schedules', FeedingScheduleController::class);
 Route::apiResource('tours', TourController::class);
+Route::apiResource('tour-registrations', TourRegistrationController::class);

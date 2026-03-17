@@ -1,68 +1,69 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Models\Visitor;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\VisitorResource;
+use App\Http\Resources\BookingResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class VisitorController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        return response()->json(Visitor::all());
+        $visitors = Visitor::with('bookings.ticket')->paginate(15);
+        return VisitorResource::collection($visitors);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'email' => 'required|email',
-                'phone' => 'nullable|string'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:visitors,email',
+            'phone' => 'nullable|string|max:20',
+        ]);
 
-            $visitor = Visitor::create($validated);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            return response()->json($visitor, 201);
+        $visitor = Visitor::create($request->all());
+        return new VisitorResource($visitor->load('bookings'));
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Visitor $visitor)
     {
-        return response()->json(Visitor::findOrFail($id));
+        return new VisitorResource($visitor->load(['bookings.ticket', 'tourRegistrations.tour']));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Visitor $visitor)
     {
-            $visitor = Visitor::findOrFail($id);
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|email|unique:visitors,email,' . $visitor->id,
+            'phone' => 'nullable|string|max:20',
+        ]);
 
-            $visitor->update($request->all());
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            return response()->json($visitor);
+        $visitor->update($request->all());
+        return new VisitorResource($visitor->load('bookings'));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Visitor $visitor)
     {
-            $visitor = Visitor::findOrFail($id);
+        $visitor->delete();
+        return response()->json(['message' => 'Visitor deleted successfully'], 200);
+    }
 
-            $visitor->delete();
-
-            return response()->json([
-                'message' => 'Visitor deleted successfully'
-            ]);
+    // Custom: Get all bookings of a visitor
+    public function bookings(Visitor $visitor)
+    {
+        $bookings = $visitor->bookings()->with('ticket')->paginate(15);
+        return BookingResource::collection($bookings);
     }
 }

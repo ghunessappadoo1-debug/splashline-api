@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Visitor extends Model
 {
-        protected $fillable = ['name','email','phone'];
+    use HasFactory;
+
+    protected $fillable = ['name', 'email', 'phone'];
 
     public function bookings()
     {

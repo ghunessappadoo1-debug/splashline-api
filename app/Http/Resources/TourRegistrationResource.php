@@ -4,18 +4,14 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class BookingResource extends JsonResource
+class TourRegistrationResource extends JsonResource
 {
     public function toArray($request)
     {
         return [
             'id' => $this->id,
+            'tour' => new TourResource($this->whenLoaded('tour')),
             'visitor' => new VisitorResource($this->whenLoaded('visitor')),
-            'ticket' => new TicketResource($this->whenLoaded('ticket')),
-            'visit_date' => $this->visit_date,
-            'quantity' => $this->quantity,
-            'total_price' => $this->total_price,
-            'status' => $this->status,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

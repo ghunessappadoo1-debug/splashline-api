@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class TourRegistration extends Model
 {
-        protected $fillable = ['tour_id','visitor_id'];
+    use HasFactory;
+
+    protected $fillable = ['tour_id', 'visitor_id'];
 
     public function tour()
     {

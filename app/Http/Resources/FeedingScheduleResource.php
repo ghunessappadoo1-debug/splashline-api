@@ -4,18 +4,16 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class AnimalResource extends JsonResource
+class FeedingScheduleResource extends JsonResource
 {
     public function toArray($request)
     {
         return [
             'id' => $this->id,
-            'name' => $this->name,
-            'species' => $this->species,
-            'age' => $this->age,
-            'fun_fact' => $this->fun_fact,
             'exhibit' => new ExhibitResource($this->whenLoaded('exhibit')),
-            'feeding_schedules' => FeedingScheduleResource::collection($this->whenLoaded('feedingSchedules')),
+            'animal' => new AnimalResource($this->whenLoaded('animal')),
+            'feeding_time' => $this->feeding_time->format('H:i'),
+            'food_type' => $this->food_type,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

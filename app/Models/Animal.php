@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Animal extends Model
 {
-        protected $fillable = ['name','species','age','exhibit_id'];
+    use HasFactory;
+
+    protected $fillable = ['name', 'species', 'age', 'fun_fact', 'exhibit_id'];
 
     public function exhibit()
     {

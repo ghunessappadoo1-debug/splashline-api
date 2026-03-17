@@ -1,74 +1,99 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Ticket;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\BookingResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class BookingController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Booking::with(['visitor','ticket'])->get());
+        $query = Booking::with(['visitor', 'ticket']);
+
+        if ($request->has('visit_date')) {
+            $query->whereDate('visit_date', $request->visit_date);
+        }
+        if ($request->has('visitor_id')) {
+            $query->where('visitor_id', $request->visitor_id);
+        }
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $bookings = $query->paginate(15);
+        return BookingResource::collection($bookings);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-            $validated = $request->validate([
-                'visitor_id' => 'required|exists:visitors,id',
-                'ticket_id' => 'required|exists:tickets,id',
-                'quantity' => 'required|integer|min:1'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'visitor_id' => 'required|exists:visitors,id',
+            'ticket_id' => 'required|exists:tickets,id',
+            'visit_date' => 'required|date|after_or_equal:today',
+            'quantity' => 'required|integer|min:1',
+        ]);
 
-            $ticket = \App\Models\Ticket::find($validated['ticket_id']);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            $validated['total_price'] = $ticket->price * $validated['quantity'];
+        $ticket = Ticket::find($request->ticket_id);
+        $totalPrice = $ticket->price * $request->quantity;
 
-            $booking = Booking::create($validated);
+        $booking = Booking::create([
+            'visitor_id' => $request->visitor_id,
+            'ticket_id' => $request->ticket_id,
+            'visit_date' => $request->visit_date,
+            'quantity' => $request->quantity,
+            'total_price' => $totalPrice,
+            'status' => 'confirmed',
+        ]);
 
-            return response()->json($booking,201);
-            }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-            $booking = Booking::with(['visitor','ticket'])->findOrFail($id);
-
-            return response()->json($booking);
+        return new BookingResource($booking->load(['visitor', 'ticket']));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function show(Booking $booking)
     {
-            $booking = Booking::findOrFail($id);
-
-            $booking->update($request->all());
-
-            return response()->json($booking);
+        return new BookingResource($booking->load(['visitor', 'ticket']));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function update(Request $request, Booking $booking)
     {
-            $booking = Booking::findOrFail($id);
+        $validator = Validator::make($request->all(), [
+            'visit_date' => 'sometimes|required|date|after_or_equal:today',
+            'quantity' => 'sometimes|required|integer|min:1',
+        ]);
 
-            $booking->delete();
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            return response()->json([
-                'message' => 'Booking deleted successfully'
-            ]);
+        if ($request->has('quantity') && $request->quantity != $booking->quantity) {
+            $booking->total_price = $booking->ticket->price * $request->quantity;
+        }
+
+        $booking->update($request->only(['visit_date', 'quantity', 'total_price']));
+        return new BookingResource($booking->load(['visitor', 'ticket']));
+    }
+
+    public function destroy(Booking $booking)
+    {
+        $booking->delete();
+        return response()->json(['message' => 'Booking deleted successfully'], 200);
+    }
+
+    // Custom: Cancel a booking (PATCH)
+    public function cancel(Booking $booking)
+    {
+        if ($booking->status === 'cancelled') {
+            return response()->json(['error' => 'Booking already cancelled'], 400);
+        }
+        $booking->update(['status' => 'cancelled']);
+        return new BookingResource($booking->load(['visitor', 'ticket']));
     }
 }

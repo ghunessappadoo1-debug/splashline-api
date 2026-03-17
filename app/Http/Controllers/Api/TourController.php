@@ -1,71 +1,105 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Models\Tour;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\TourResource;
+use App\Http\Resources\TourRegistrationResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class TourController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        return response()->json(Tour::all());
+        $tours = Tour::with('registrations.visitor')->paginate(15);
+        return TourResource::collection($tours);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-            $validated = $request->validate([
-                'title' => 'required|string|max:255',
-                'description' => 'nullable|string',
-                'schedule_time' => 'required|date',
-                'max_capacity' => 'required|integer'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'start_time' => 'required|date',
+            'end_time' => 'required|date|after:start_time',
+            'max_participants' => 'required|integer|min:1',
+        ]);
 
-            $tour = Tour::create($validated);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            return response()->json($tour, 201);
+        $tour = Tour::create($request->all());
+        return new TourResource($tour);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Tour $tour)
     {
-            $tour = Tour::findOrFail($id);
-
-            return response()->json($tour);
+        return new TourResource($tour->load('registrations.visitor'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Tour $tour)
     {
-            $tour = Tour::findOrFail($id);
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'start_time' => 'sometimes|required|date',
+            'end_time' => 'sometimes|required|date|after:start_time',
+            'max_participants' => 'sometimes|required|integer|min:1',
+        ]);
 
-            $tour->update($request->all());
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            return response()->json($tour);
+        $tour->update($request->all());
+        return new TourResource($tour);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Tour $tour)
     {
-            $tour = Tour::findOrFail($id);
+        $tour->delete();
+        return response()->json(['message' => 'Tour deleted'], 200);
+    }
 
-            $tour->delete();
+    // Custom: Register a visitor for a tour
+    public function register(Request $request, Tour $tour)
+    {
+        $validator = Validator::make($request->all(), [
+            'visitor_id' => 'required|exists:visitors,id',
+        ]);
 
-            return response()->json([
-                'message' => 'Tour deleted successfully'
-            ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        // Check if already registered
+        $exists = $tour->registrations()->where('visitor_id', $request->visitor_id)->exists();
+        if ($exists) {
+            return response()->json(['error' => 'Visitor already registered for this tour'], 400);
+        }
+
+        // Check capacity
+        if ($tour->registrations()->count() >= $tour->max_participants) {
+            return response()->json(['error' => 'Tour is full'], 400);
+        }
+
+        $registration = $tour->registrations()->create([
+            'visitor_id' => $request->visitor_id,
+        ]);
+
+        return new TourRegistrationResource($registration->load('visitor'));
+    }
+
+    // Custom: List upcoming tours
+    public function upcoming()
+    {
+        $tours = Tour::where('start_time', '>', now())
+                     ->with('registrations')
+                     ->orderBy('start_time')
+                     ->paginate(15);
+        return TourResource::collection($tours);
     }
 }

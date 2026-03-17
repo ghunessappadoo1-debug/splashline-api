@@ -2,11 +2,19 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Tour extends Model
 {
-        protected $fillable = ['title','description','schedule_time','max_capacity'];
+    use HasFactory;
+
+    protected $fillable = ['name', 'description', 'start_time', 'end_time', 'max_participants'];
+
+    protected $casts = [
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
+    ];
 
     public function registrations()
     {

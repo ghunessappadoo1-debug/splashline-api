@@ -1,71 +1,82 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Models\Animal;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\AnimalResource;
+use App\Http\Resources\FeedingScheduleResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class AnimalController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $request)
     {
-         return response()->json(Animal::all());
+        $query = Animal::with('exhibit');
+
+        if ($request->has('species')) {
+            $query->where('species', 'like', '%' . $request->species . '%');
+        }
+        if ($request->has('exhibit_id')) {
+            $query->where('exhibit_id', $request->exhibit_id);
+        }
+
+        $animals = $query->paginate(15);
+        return AnimalResource::collection($animals);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'species' => 'required|string|max:255',
-                'age' => 'required|integer',
-                'exhibit_id' => 'required|exists:exhibits,id'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'species' => 'required|string|max:255',
+            'age' => 'nullable|integer|min:0',
+            'fun_fact' => 'nullable|string',
+            'exhibit_id' => 'required|exists:exhibits,id',
+        ]);
 
-            $animal = Animal::create($validated);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            return response()->json($animal, 201);
+        $animal = Animal::create($request->all());
+        return new AnimalResource($animal->load('exhibit'));
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show(Animal $animal)
     {
-            $animal = Animal::findOrFail($id);
-
-            return response()->json($animal);
+        return new AnimalResource($animal->load(['exhibit', 'feedingSchedules']));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function update(Request $request, Animal $animal)
     {
-            $animal = Animal::findOrFail($id);
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'species' => 'sometimes|required|string|max:255',
+            'age' => 'nullable|integer|min:0',
+            'fun_fact' => 'nullable|string',
+            'exhibit_id' => 'sometimes|required|exists:exhibits,id',
+        ]);
 
-            $animal->update($request->all());
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            return response()->json($animal);
+        $animal->update($request->all());
+        return new AnimalResource($animal->load('exhibit'));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(Animal $animal)
     {
-            $animal = Animal::findOrFail($id);
+        $animal->delete();
+        return response()->json(['message' => 'Animal deleted successfully'], 200);
+    }
 
-            $animal->delete();
-
-            return response()->json([
-                'message' => 'Animal deleted successfully'
-            ]);
+    // Custom: Get feeding schedule for this animal
+    public function feedingSchedule(Animal $animal)
+    {
+        $schedules = $animal->feedingSchedules()->paginate(15);
+        return FeedingScheduleResource::collection($schedules);
     }
 }

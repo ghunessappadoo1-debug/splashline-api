@@ -1,72 +1,57 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Models\TourRegistration;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\TourRegistrationResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class TourRegistrationController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(
-            TourRegistration::with(['visitor','tour'])->get()
-        );
+        $query = TourRegistration::with(['tour', 'visitor']);
 
+        if ($request->has('tour_id')) {
+            $query->where('tour_id', $request->tour_id);
+        }
+
+        $registrations = $query->paginate(15);
+        return TourRegistrationResource::collection($registrations);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-            $validated = $request->validate([
-                'visitor_id' => 'required|exists:visitors,id',
-                'tour_id' => 'required|exists:tours,id'
-            ]);
+        // Usually registration is handled via TourController::register, but we keep for completeness
+        $validator = Validator::make($request->all(), [
+            'tour_id' => 'required|exists:tours,id',
+            'visitor_id' => 'required|exists:visitors,id',
+        ]);
 
-            $registration = TourRegistration::create($validated);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
-            return response()->json($registration,201);
-            }
+        // Check capacity
+        $tour = Tour::find($request->tour_id);
+        if ($tour->registrations()->count() >= $tour->max_participants) {
+            return response()->json(['error' => 'Tour is full'], 400);
+        }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-            $registration = TourRegistration::with(['visitor','tour'])->findOrFail($id);
-
-            return response()->json($registration);
+        $registration = TourRegistration::create($request->all());
+        return new TourRegistrationResource($registration->load(['tour', 'visitor']));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    public function show(TourRegistration $tourRegistration)
     {
-            $registration = TourRegistration::findOrFail($id);
-
-            $registration->update($request->all());
-
-            return response()->json($registration);
+        return new TourRegistrationResource($tourRegistration->load(['tour', 'visitor']));
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(TourRegistration $tourRegistration)
     {
-            $registration = TourRegistration::findOrFail($id);
-
-            $registration->delete();
-
-            return response()->json([
-                'message' => 'Registration deleted successfully'
-            ]);
+        $tourRegistration->delete();
+        return response()->json(['message' => 'Registration cancelled'], 200);
     }
 }
